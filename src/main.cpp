@@ -403,7 +403,7 @@ bool loadTrackConfig() {
                     Serial.println(F("Failed to read file, using default configuration"));
                 } else {
                     json = jsonTmp;
-                    serializeJsonPretty(json, Serial);
+                    // serializeJsonPretty(json, Serial);
                     return true;
                 }
             }
@@ -428,7 +428,7 @@ bool saveConfigSPIFFS() {
                 Serial.println("failed to open config file for writing");
             } else {
                 serializeJson(json, configFile);
-                serializeJsonPretty(json, Serial);
+                // serializeJsonPretty(json, Serial);
                 configFile.close();
                 return true;
             }
