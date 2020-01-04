@@ -1,0 +1,88 @@
+<p>Protocol to use when communicating with the tracker</p>
+<div><input class="protocol_check" style='width:auto' type='radio' name='protocol' id='check_freepie' value='freepie'>FreePie</div>
+<div><input class="protocol_check" style='width:auto' type='radio' name='protocol' id='check_opentrackudp' value='opentrackudp'>Opentrack UDP</div>
+</br>
+<script>
+    el_track_protocol = $('#track_protocol');
+    el_check_opentrackudp = $('#check_opentrackudp');
+    el_check_freepie = $('#check_freepie');
+    protoValue = el_track_protocol.val();
+    if (protoValue === 'freepie') el_check_freepie[0].checked=true;
+    if (protoValue === 'opentrackudp') el_check_opentrackudp[0].checked=true;
+    el_check_freepie.on('click', (e) => {
+        el_track_protocol.val('freepie')
+    });
+    el_check_opentrackudp.on('click', (e) => { 
+        el_track_protocol.val('opentrackudp')
+    });
+</script>
+
+<p> Tracker: </p>
+Yaw: <span id="el_yaw"></span>&deg;</br>
+Pitch: <span id="el_pitch"></span>&deg;</br>
+Roll: <span id="el_roll"></span>&deg;</br>
+
+<hr />
+<P>To calibrate place the device on a flat service and keep it 
+    still untill we show the calibration results. This can take up to 10 seconds.
+    Make sure your device has been on for a few minutes in the same environment where
+    you are planning to work with it (cold work gararage vs warm and cozy living room).
+</P>
+<P>After the calibration is finnished we will use these values and display them here, then we 
+    restart your device.</P>
+<button id="calibrate" onclick="return false;">Calibrate</button>
+<p id="calibration_status"></p>
+
+<div style="display:none" id="calibration_result">    
+    XGyroOffset: <span id="el_XGyroOffset">-</span><br/>
+    YGyroOffset: <span id="el_YGyroOffset">-</span><br/>
+    ZGyroOffset: <span id="el_ZGyroOffset">-</span><br/>
+    XAccelOffset: <span id="el_XAccelOffset">-</span><br/>
+    YAccelOffset: <span id="el_YAccelOffset">-</span><br/>
+    ZAccelOffset: <span id="el_ZAccelOffset">-</span><br/>
+</div>
+
+<hr />
+
+<script>
+el_yaw = $('#el_yaw');
+el_pitch = $('#el_pitch');
+el_roll = $('#el_roll');
+
+setInterval(() => {
+    fetchival('/peek')
+    .get()
+    .then(function(json) {
+        el_yaw.html(json.yaw);
+        el_pitch.html(json.pitch);
+        el_roll.html(json.roll);
+    })
+}, 2000);
+
+$("#calibrate").on('click', function (e) {
+    $("button").css("opacity", "0.8").css("display", "inline").attr("disabled", true);
+    $('#calibration_status').html("Calibrating, please wait....");
+    fetchival('/calibrate')
+    .get()
+    .then(function(result) {
+        if (result.status === 'error') {
+            $('#calibration_status').html(result.message);
+        } else {
+            $('#calibration_result').css("display", "block");
+            $('#calibration_status').html("Ok! ..... Restarting device.");
+            $('#el_XGyroOffset').html(result.XGyroOffset);
+            $('#el_YGyroOffset').html(result.YGyroOffset);
+            $('#el_ZGyroOffset').html(result.ZGyroOffset);
+            $('#el_XAccelOffset').html(result.XAccelOffset);
+            $('#el_YAccelOffset').html(result.YAccelOffset);
+            $('#el_ZAccelOffset').html(result.ZAccelOffset);
+        }
+    })
+    .catch(function(err) {
+        $('#calibration_status').html("Unknown error");
+    })
+})
+
+</script>
+
+
