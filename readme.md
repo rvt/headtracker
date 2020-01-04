@@ -6,7 +6,7 @@ Install platform IO
 
 ```bash
 # Build char* array for web
-./javascriptToHeader.sh
+./generateHtmlArray.sh
 platformio run --target upload -e wemos
 platformio device monitor --baud 115200
 ```
