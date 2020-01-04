@@ -29,7 +29,7 @@ While you are at it go to the setup page to tell setup the location and protocol
 # Where to put the MPU
 
 I have designed a little box that can be printed using a 3D printer.
-It´s a bit tricky to print but it will work out if you put up some support material. The STL file (mpu6050_holder.stl) is included.
+It´s a bit tricky to print but it will work out if you put up some support material. The STL file (mpu6050_holder.stl) is included. Then I have sewed it on a baseball cap. I´s very light and you will hardly fill it.
 
 ![Holder for MPU6050 menu](img/mpu6050_holder.png "mpu6050")
 
