@@ -299,9 +299,9 @@ void mpu_loop() {
         //mpu.dmpGetEuler(euler, &q);
 
         // Copy to last so we can use this in our webserver
-        last_measurement.yaw = ypr[0] * 180 / M_PI;
-        last_measurement.pitch = ypr[1] * 180 / M_PI;
-        last_measurement.roll = ypr[2] * 180 / M_PI;
+        last_measurement.yaw = ypr[0];
+        last_measurement.pitch = ypr[1];
+        last_measurement.roll = ypr[2];
         last_measurement.x = 0.0f;
         last_measurement.y = 0.0f;
         last_measurement.z = 0.0f;
@@ -335,9 +335,9 @@ void serverOnlineCallback() {
     wm.server->on(TRACK_PEEK_URI, []() {
         char payloadBuffer[128];
         sprintf(payloadBuffer, F("{\"yaw\":%.2f,\"pitch\":%.2f,\"roll\":%.2f,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f}"),
-                last_measurement.yaw,
-                last_measurement.pitch,
-                last_measurement.roll,
+                last_measurement.yaw * 180 / M_PI,
+                last_measurement.pitch * 180 / M_PI,
+                last_measurement.roll * 180 / M_PI,
                 last_measurement.x,
                 last_measurement.y,
                 last_measurement.z
@@ -541,7 +541,7 @@ void loop() {
         if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
             wm.process();
         } else if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
-            if (!dmpReady && (transitionCounter % (UPDATES_PER_SECOND * 5) == slot - 1)) {
+            if (!dmpReady && (transitionCounter % UPDATES_PER_SECOND == slot - 1)) {
                 mpu_setup();
             }
         } else if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
