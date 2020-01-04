@@ -111,6 +111,21 @@ void saveParamCallback() {
     json["tracker_port"] = custom_track_port.getValue();
     json["tracker_protocol"] = custom_track_protocol.getValue();
     shouldSaveConfig = true;
+    shouldReloadAddress = true;
+}
+
+/**
+ * Load the tracker information into trackerPort and trackerIpAddress
+ * return true if that condition is matched
+ */
+bool loadAddressInfoFromConfig() {
+    if (json.containsKey("tracker_server")) {
+        trackerPort = json["tracker_port"].as<int>();
+        const char* tmp = json["tracker_server"].as<char*>();
+        return trackerIpAddress.fromString(tmp);
+    }
+
+    return false;
 }
 
 void sendDatagramToTracker(const  uint8_t* buffer, size_t size) {
@@ -122,13 +137,13 @@ void sendDatagramToTracker(const  uint8_t* buffer, size_t size) {
 /**
  * Send tracker information using FreePie datastructure
  */
-void sendFreePieDatagram(const float ypr[3]) {
+void sendFreePieDatagram() {
     FreePie freepie {
         0,
         2,
-        ypr[0],
-        ypr[1],
-        ypr[2],
+        last_measurement.yaw,
+        last_measurement.pitch,
+        last_measurement.roll,
         0, 0, 0,
         0, 0, 0, 0, 0, 0
     };
@@ -138,14 +153,14 @@ void sendFreePieDatagram(const float ypr[3]) {
 /**
  * Send a datagram using OpenTrack UDP data structure
  */
-void sendOpentrackDatagram(const float ypr[3]) {
+void sendOpentrackDatagram() {
     OpenTrack openTrack {
         0.0,
         0.0,
         0.0,
-        ypr[0] * 180 / M_PI,
-        ypr[1] * 180 / M_PI,
-        ypr[2] * 180 / M_PI
+        last_measurement.yaw * 180 / M_PI,
+        last_measurement.pitch * 180 / M_PI,
+        last_measurement.roll * 180 / M_PI
     };
     sendDatagramToTracker((uint8_t*) &openTrack, (size_t)sizeof(OpenTrack));
 }
@@ -153,15 +168,15 @@ void sendOpentrackDatagram(const float ypr[3]) {
 /**
  * Send to tracker if hasTrackerLocation is set to true
  */
-void sendTracker(const float ypr[3]) {
+void sendTracker() {
     if (!hasTrackerLocation) {
         return;
     }
 
     if (strcmp(custom_track_protocol.getValue(), PROTOCOL_OPENTRACKUDP) == 0) {
-        sendOpentrackDatagram(ypr);
+        sendOpentrackDatagram();
     } else {
-        sendFreePieDatagram(ypr);
+        sendFreePieDatagram();
     }
 }
 
@@ -291,6 +306,8 @@ void mpu_loop() {
         last_measurement.y = 0.0f;
         last_measurement.z = 0.0f;
 
+        sendTracker();
+
         /* Serial.print("ypr\t");
         Serial.print(ypr[0] * 180/M_PI);
         Serial.print("\t");
@@ -403,7 +420,7 @@ bool loadTrackConfig() {
                     Serial.println(F("Failed to read file, using default configuration"));
                 } else {
                     json = jsonTmp;
-                    // serializeJsonPretty(json, Serial);
+                    serializeJsonPretty(json, Serial);
                     return true;
                 }
             }
@@ -438,18 +455,7 @@ bool saveConfigSPIFFS() {
     return false;
 }
 
-/**
- * Load the tracker information into trackerPort and trackerIpAddress
- * return true if that condition is matched
- */
-bool loadAddressInfoFromConfig() {
-    if (custom_track_port.getValue() != nullptr && custom_track_server.getValue() != nullptr) {
-        trackerPort = atoi(custom_track_port.getValue());
-        return trackerIpAddress.fromString(custom_track_server.getValue());
-    }
 
-    return false;
-}
 
 void setup() {
 
@@ -526,7 +532,7 @@ void loop() {
     if (currentMillis - effectPeriodStartMillis >= EFFECT_PERIOD_CALLBACK) {
         effectPeriodStartMillis = currentMillis;
         transitionCounter++;
-        uint8_t slot = 0;
+        int8_t slot = 0;
 
         if (dmpReady) {
             mpu_loop();
@@ -535,13 +541,13 @@ void loop() {
         if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
             wm.process();
         } else if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
-            if (!dmpReady && (transitionCounter % UPDATES_PER_SECOND == slot-1)) {
+            if (!dmpReady && (transitionCounter % (UPDATES_PER_SECOND * 5) == slot - 1)) {
                 mpu_setup();
             }
         } else if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
             if (shouldSaveConfig) {
                 shouldSaveConfig = false;
-                shouldReloadAddress = saveConfigSPIFFS();
+                saveConfigSPIFFS();
             } else if (shouldRestart != 0 && (currentMillis - shouldRestart >= 5000)) {
                 shouldRestart = 0;
                 ESP.restart();
