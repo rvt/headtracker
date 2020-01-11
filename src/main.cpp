@@ -22,11 +22,12 @@
 
 #include "udpStructures.h"
 
-#include "I2Cdev.h"
-#include "MPU6050_6Axis_MotionApps_V6_12.h"
-
 #include "jscript.generated.h"
 #include "protocolSelect_html.generated.h"
+#include "I2Cdev.h"
+#include <hwheadtrack.h>
+#include <hwheadtrackmpu6050.h>
+
 
 #define UPDATES_PER_SECOND            200
 #define EFFECT_PERIOD_CALLBACK        (1000 / UPDATES_PER_SECOND)
@@ -34,7 +35,6 @@
 #define TRACKER_CONFIG_DOCUMENT_SIZE  512
 #define PROTOCOL_FREEPIE              "freepie"
 #define PROTOCOL_OPENTRACKUDP         "opentrackudp"
-#define INTERRUPT_PIN                 15 // use pin 15 on ESP8266
 #undef M_PI
 #define M_PI 3.14159265358979323846f
 
@@ -52,21 +52,8 @@ uint32_t shouldRestart = 0;        // Indicate that a service requested an resta
 bool shouldReloadAddress = false;  // Indicate when we should reload trackerIpAddress and trackerPort
 bool hasTrackerLocation = false;   // Indicate when the tracker IP and port is known and good
 
-// Used in mpu
-volatile bool mpuInterrupt = false;         // indicates whether MPU interrupt pin has gone high
-bool dmpReady = false;             // Indicate that the DMP is ready
-uint16_t packetSize;                        // expected DMP packet size (default is 42 bytes)
-uint8_t fifoBuffer[64];                     // FIFO storage buffer
-uint16_t fifoCount;                         // count of all bytes currently in FIFO
-
-struct LastMeasurements {
-    float yaw;
-    float pitch;
-    float roll;
-    float x;
-    float y;
-    float z;
-} last_measurement;
+HWHeadTrack_Orientation last_measurement;
+std::unique_ptr<HWHeadTrack> hwTrack(nullptr);
 
 // Used to send data over UDP
 IPAddress trackerIpAddress;        // tracker IP address, should be reloaded on each config chance
@@ -81,14 +68,6 @@ WiFiManager wm;
 // A UDP instance to let us send and receive packets over UDP
 WiFiUDP Udp;
 
-// class default I2C address is 0x68
-// specific I2C addresses may be passed as a parameter here
-// AD0 low = 0x68 (default for SparkFun breakout and InvenSense evaluation board)
-// AD0 high = 0x69
-MPU6050 mpu;
-//MPU6050 mpu(0x69); // <-- use for AD0 high
-
-
 
 WiFiManagerParameter custom_html("<p>Configure the location of OpenTrack or other receiver,</p>"); // only custom html
 WiFiManagerParameter custom_track_server("track_server", "IP Address", nullptr, 40);
@@ -100,9 +79,6 @@ const char custoHeader[] = "<script src='/jscript.js'></script>";
 WiFiManagerParameter custom_track_protocol("track_protocol", "", PROTOCOL_FREEPIE, 18, "type='hidden'");
 WiFiManagerParameter custom_protocol_radio((char*)protocolSelect_html_nt);
 
-void ICACHE_RAM_ATTR dmpDataReady() {
-    mpuInterrupt = true;
-}
 
 
 void saveParamCallback() {
@@ -180,146 +156,9 @@ void sendTracker() {
     }
 }
 
-/**
- * Sendup the motion process
- */
-void mpu_setup() {
 
 
-    // initialize device
-    Serial.println(F("Initializing I2C devices..."));
-    mpu.initialize();
-    pinMode(INTERRUPT_PIN, INPUT);
 
-    // verify connection
-    Serial.println(F("Testing device connections..."));
-    Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
-
-    // load and configure the DMP
-    Serial.println(F("Initializing DMP..."));
-    uint8_t devStatus = mpu.dmpInitialize();
-
-    // make sure it worked (returns 0 if so)
-    if (devStatus == 0) {
-
-        if (json.containsKey("mpu6050")) {
-            JsonObject mpuConfig = json["mpu6050"].as<JsonObject>();
-            mpu.setXGyroOffset(mpuConfig["XGyroOffset"].as<int>());
-            mpu.setYGyroOffset(mpuConfig["YGyroOffset"].as<int>());
-            mpu.setZGyroOffset(mpuConfig["ZGyroOffset"].as<int>());
-            mpu.setXAccelOffset(mpuConfig["XAccelOffset"].as<int>());
-            mpu.setYAccelOffset(mpuConfig["YAccelOffset"].as<int>());
-            mpu.setZAccelOffset(mpuConfig["ZAccelOffset"].as<int>());
-            Serial.println(F("Using saved calibration."));
-        } else {
-            // Set some defaults to might be okish....
-            mpu.setXGyroOffset(51);
-            mpu.setYGyroOffset(8);
-            mpu.setZGyroOffset(21);
-            mpu.setXAccelOffset(1150);
-            mpu.setYAccelOffset(-50);
-            mpu.setZAccelOffset(1060);
-        }
-
-        // Perform calibration
-        //mpu.CalibrateAccel(6);
-        //mpu.CalibrateGyro(6);
-
-        // turn on the DMP, now that it's ready
-        Serial.println(F("Enabling DMP..."));
-        mpu.setDMPEnabled(true);
-
-        // enable Arduino interrupt detection
-        attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
-        mpu.getIntStatus();
-
-        // set our DMP Ready flag so the main loop() function knows it's okay to use it
-        dmpReady = true;
-
-        // get expected DMP packet size for later comparison
-        packetSize = mpu.dmpGetFIFOPacketSize();
-    } else {
-        // ERROR!
-        // 1 = initial memory load failed
-        // 2 = DMP configuration updates failed
-        // (if it's going to break, usually the code will be 1)
-        Serial.print(F("DMP Initialization failed (code "));
-        Serial.print(devStatus);
-        Serial.println(F(")"));
-    }
-}
-
-void mpu_loop() {
-    // if programming failed, don't try to do anything
-    if (!dmpReady) {
-        return;
-    }
-
-    // wait for MPU interrupt or extra packet(s) available
-    if (!mpuInterrupt && fifoCount < packetSize) {
-        return;
-    }
-
-    // reset interrupt flag and get INT_STATUS byte
-    mpuInterrupt = false;
-    uint8_t mpuIntStatus = mpu.getIntStatus();
-
-    // get current FIFO count
-    fifoCount = mpu.getFIFOCount();
-
-    // check for overflow (this should never happen unless our code is too inefficient)
-    if ((mpuIntStatus & 0x10) || fifoCount == 1024) {
-        // reset so we can continue cleanly
-        mpu.resetFIFO();
-        Serial.println(F("FIFO overflow!"));
-
-        // otherwise, check for DMP data ready interrupt (this should happen frequently)
-    } else if (mpuIntStatus & 0x02) {
-        // wait for correct available data length, should be a VERY short wait
-        while (fifoCount < packetSize) {
-            fifoCount = mpu.getFIFOCount();
-        }
-
-        // read a packet from FIFO
-        mpu.getFIFOBytes(fifoBuffer, packetSize);
-
-        // track FIFO count here in case there is > 1 packet available
-        // (this lets us immediately read more without waiting for an interrupt)
-        fifoCount -= packetSize;
-
-        float ypr[3];
-        Quaternion q;           // [w, x, y, z]         quaternion container
-        VectorFloat gravity;    // [x, y, z]            gravity vector
-
-        mpu.dmpGetQuaternion(&q, fifoBuffer);
-        mpu.dmpGetGravity(&gravity, &q);
-        mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-
-        //float euler[3];         // [psi, theta, phi]    Euler angle container
-        //mpu.dmpGetEuler(euler, &q);
-
-        // Copy to last so we can use this in our webserver
-        last_measurement.yaw = ypr[0];
-        last_measurement.pitch = ypr[1];
-        last_measurement.roll = ypr[2];
-        last_measurement.x = 0.0f;
-        last_measurement.y = 0.0f;
-        last_measurement.z = 0.0f;
-
-        sendTracker();
-
-        /* Serial.print("ypr\t");
-        Serial.print(ypr[0] * 180/M_PI);
-        Serial.print("\t");
-        Serial.print(ypr[1] * 180/M_PI);
-        Serial.print("\t");
-        Serial.print(ypr[2] * 180/M_PI);
-        Serial.print("\t");
-        Serial.print((size_t)sizeof(FreePie));
-        Serial.println("");
-        sendTracker(ypr); */
-    }
-}
 
 /**
  * When server comes online setup other routes
@@ -334,7 +173,7 @@ void serverOnlineCallback() {
 
     wm.server->on(TRACK_PEEK_URI, []() {
         char payloadBuffer[128];
-        sprintf(payloadBuffer, F("{\"yaw\":%.2f,\"pitch\":%.2f,\"roll\":%.2f,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f}"),
+        sprintf(payloadBuffer, "{\"yaw\":%.2f,\"pitch\":%.2f,\"roll\":%.2f,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f}",
                 last_measurement.yaw * 180 / M_PI,
                 last_measurement.pitch * 180 / M_PI,
                 last_measurement.roll * 180 / M_PI,
@@ -348,47 +187,21 @@ void serverOnlineCallback() {
     });
 
     wm.server->on(STORE_CALIBRATION_URI, []() {
-        if (dmpReady) {
-            dmpReady = false;
+        if (hwTrack->isReady()) {
 
-            MPU6050 calMpu;
-            calMpu.reset();
-            delay(100);
-            calMpu.initialize();
+            JsonObject config = json[hwTrack->name()].as<JsonObject>();
+            hwTrack->calibrate(config);
+            serializeJsonPretty(config, Serial);
 
-            // Set offset based on last measurement
-            calMpu.setXGyroOffset(mpu.getXGyroOffset());
-            calMpu.setXGyroOffset(mpu.getYGyroOffset());
-            calMpu.setXGyroOffset(mpu.getZGyroOffset());
-            calMpu.setXGyroOffset(mpu.getXAccelOffset());
-            calMpu.setXGyroOffset(mpu.getYAccelOffset());
-            calMpu.setXGyroOffset(mpu.getZAccelOffset());
-
-            // Do calibration
-            calMpu.CalibrateAccel(6);
-            calMpu.CalibrateGyro(6);
-            calMpu.CalibrateAccel(1);
-            calMpu.CalibrateGyro(1);
-            calMpu.CalibrateAccel(1);
-            calMpu.CalibrateGyro(1);
-
-            // Store config
-            StaticJsonDocument<200> mpuConfig;
-            mpuConfig["XGyroOffset"] = mpu.getYGyroOffset();
-            mpuConfig["YGyroOffset"] = mpu.getYGyroOffset();
-            mpuConfig["ZGyroOffset"] = mpu.getZGyroOffset();
-            mpuConfig["XAccelOffset"] = mpu.getXAccelOffset();
-            mpuConfig["YAccelOffset"] = mpu.getYAccelOffset();
-            mpuConfig["ZAccelOffset"] = mpu.getZAccelOffset();
-            json["mpu6050"] = mpuConfig;
             shouldSaveConfig = true;
 
             // Send result back
-            wm.server->setContentLength(measureJson(mpuConfig));
+            wm.server->setContentLength(measureJson(config));
             wm.server->send(200, F("application/javascript"), "");
             WiFiClient client = wm.server->client();
-            serializeJson(mpuConfig, client);
+            serializeJson(config, client);
 
+            // Request restart
             shouldRestart = millis();
         } else {
             // We would like to send a 503 but tje JS framework doesn´t give us the body
@@ -521,6 +334,7 @@ void setup() {
 #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
     Fastwire::setup(400, true);
 #endif
+    hwTrack.reset(new HWHeadTrackmpu6050());
     effectPeriodStartMillis = millis();
 }
 
@@ -532,17 +346,17 @@ void loop() {
     if (currentMillis - effectPeriodStartMillis >= EFFECT_PERIOD_CALLBACK) {
         effectPeriodStartMillis = currentMillis;
         transitionCounter++;
-        int8_t slot = 0;
+        uint8_t slot = 0;
 
-        if (dmpReady) {
-            mpu_loop();
+        if (hwTrack->loop()) {
+            last_measurement = hwTrack->getOrientation();
         }
 
         if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
             wm.process();
         } else if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
-            if (!dmpReady && (transitionCounter % UPDATES_PER_SECOND == slot - 1)) {
-                mpu_setup();
+            if (transitionCounter % UPDATES_PER_SECOND == slot - 1) {
+                hwTrack->setup(json[hwTrack->name()]);
             }
         } else if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
             if (shouldSaveConfig) {
