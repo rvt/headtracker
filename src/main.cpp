@@ -27,6 +27,7 @@
 #include "I2Cdev.h"
 #include <hwheadtrack.h>
 #include <hwheadtrackmpu6050.h>
+#include <hwheadtrackmpu9250.h>
 
 
 #define UPDATES_PER_SECOND            200
@@ -189,6 +190,9 @@ void serverOnlineCallback() {
     wm.server->on(STORE_CALIBRATION_URI, []() {
         if (hwTrack->isReady()) {
 
+            if (!json.containsKey(hwTrack->name())) {
+                json.createNestedObject(hwTrack->name());
+            }
             JsonObject config = json[hwTrack->name()].as<JsonObject>();
             hwTrack->calibrate(config);
             serializeJsonPretty(config, Serial);
@@ -335,6 +339,8 @@ void setup() {
     Fastwire::setup(400, true);
 #endif
     hwTrack.reset(new HWHeadTrackmpu6050());
+//    hwTrack.reset(new HWHeadTrackmpu9250());
+    
     effectPeriodStartMillis = millis();
 }
 
