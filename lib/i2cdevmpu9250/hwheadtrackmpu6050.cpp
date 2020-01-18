@@ -1,11 +1,11 @@
 #include "hwheadtrackmpu6050.h"
-#include "MPU6050_6Axis_MotionApps_V6_12.h"
+#include <MPU6050_6Axis_MotionApps_V6_12.h>
 
 #define INTERRUPT_PIN                 15 // use pin 15 on ESP8266
 
 volatile bool HWHeadTrackmpu6050_mpuInterrupt = false;
 
-void ICACHE_RAM_ATTR dmpDataReady() {
+void ICACHE_RAM_ATTR HWHeadTrackmpu6050_dmpDataReady() {
     HWHeadTrackmpu6050_mpuInterrupt = true;
 }
 
@@ -73,11 +73,11 @@ bool HWHeadTrackmpu6050::loop() {
         //        sendTracker();
 
         /*Serial.print("ypr\t");
-        Serial.print(ypr[0] * 180/3.141);
+        Serial.print(pOrientation[0] * 180/3.141);
         Serial.print("\t");
-        Serial.print(ypr[1] * 180/3.141);
+        Serial.print(pOrientation[1] * 180/3.141);
         Serial.print("\t");
-        Serial.print(ypr[2] * 180/3.141);
+        Serial.print(pOrientation[2] * 180/3.141);
         Serial.print("\t");
         Serial.println("");*/
         return true;
@@ -88,11 +88,13 @@ bool HWHeadTrackmpu6050::loop() {
 
 void HWHeadTrackmpu6050::setup(JsonObject json) {
     // initialize device
-    if (isReady()) return;
+    if (isReady()) {
+        return;
+    }
 
     Serial.println(F("Initializing MPU6050..."));
-    mpu->initialize();
     pinMode(INTERRUPT_PIN, INPUT);
+    mpu->initialize();
 
     // verify connection
     Serial.println(F("Testing device connections..."));
@@ -132,7 +134,7 @@ void HWHeadTrackmpu6050::setup(JsonObject json) {
         mpu->setDMPEnabled(true);
 
         // enable Arduino interrupt detection
-        attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
+        attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), HWHeadTrackmpu6050_dmpDataReady, RISING);
         mpu->getIntStatus();
 
         // set our DMP Ready flag so the main loop() function knows it's okay to use it
@@ -151,7 +153,7 @@ void HWHeadTrackmpu6050::setup(JsonObject json) {
     }
 }
 
-void HWHeadTrackmpu6050::calibrate(JsonObject &jsonObject) {
+void HWHeadTrackmpu6050::calibrate(JsonObject& jsonObject) {
     //JsonObject j;
     //if (!isReady()) return j;
     _dmpReady = false;

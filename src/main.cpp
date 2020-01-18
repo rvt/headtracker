@@ -193,6 +193,7 @@ void serverOnlineCallback() {
             if (!json.containsKey(hwTrack->name())) {
                 json.createNestedObject(hwTrack->name());
             }
+
             JsonObject config = json[hwTrack->name()].as<JsonObject>();
             hwTrack->calibrate(config);
             serializeJsonPretty(config, Serial);
@@ -338,9 +339,9 @@ void setup() {
 #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
     Fastwire::setup(400, true);
 #endif
-    hwTrack.reset(new HWHeadTrackmpu6050());
-//    hwTrack.reset(new HWHeadTrackmpu9250());
-    
+    //hwTrack.reset(new HWHeadTrackmpu6050());
+    hwTrack.reset(new HWHeadTrackmpu9250());
+
     effectPeriodStartMillis = millis();
 }
 

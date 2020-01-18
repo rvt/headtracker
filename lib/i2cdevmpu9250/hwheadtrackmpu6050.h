@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hwheadtrack.h"
+#include <hwheadtrack.h>
 #include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
 
 //volatile bool HWHeadTrackmpu6050_mpuInterrupt = false;         // indicates whether MPU interrupt pin has gone high
@@ -26,7 +26,7 @@ public:
     }
     virtual void setup(JsonObject json);
     virtual bool loop();
-    virtual void calibrate(JsonObject &jsonObject);
+    virtual void calibrate(JsonObject& jsonObject);
     virtual HWHeadTrack_Orientation getOrientation() const {
         return pOrientation;
     }
