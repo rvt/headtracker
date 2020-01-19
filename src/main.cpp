@@ -84,11 +84,14 @@ WiFiManagerParameter custom_protocol_radio((char*)protocolSelect_html_nt);
 
 void saveParamCallback() {
     Serial.println("[CALLBACK] saveParamCallback fired");
-    json["tracker_server"] = custom_track_server.getValue();
-    json["tracker_port"] = custom_track_port.getValue();
-    json["tracker_protocol"] = custom_track_protocol.getValue();
-    shouldSaveConfig = true;
-    shouldReloadAddress = true;
+
+    if (strlen(custom_track_server.getValue()) > 0) {
+        json["tracker_server"] = custom_track_server.getValue();
+        json["tracker_port"] = custom_track_port.getValue();
+        json["tracker_protocol"] = custom_track_protocol.getValue();
+        shouldSaveConfig = true;
+        shouldReloadAddress = true;
+    }
 }
 
 /**
@@ -358,7 +361,7 @@ void loop() {
         if (hwTrack->loop()) {
             last_measurement = hwTrack->getOrientation();
         }
-            
+
         sendTracker();
 
         if (transitionCounter % NUMBER_OF_SLOTS == slot++) {

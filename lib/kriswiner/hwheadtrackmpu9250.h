@@ -22,29 +22,36 @@ private:
     *  (1 + sampleRate) is a simple divisor of the fundamental 1000 kHz rate of the gyro and accel, so
     *  sampleRate = 0x00 means 1 kHz sample rate for both accel and gyro, 0x04 means 200 Hz, etc.
     */
-    uint8_t Gscale = GFS_250DPS, Ascale = AFS_2G, Mscale = MFS_16BITS, Mmode = M_100Hz, sampleRate = 0x04;
+    const uint8_t Gscale = GFS_250DPS;
+    const uint8_t Ascale = AFS_2G;
+    const uint8_t Mscale = MFS_16BITS;
+    const uint8_t Mmode = M_100Hz;
+    const uint8_t sampleRate = 0x04;
     float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
+
     // global constants for 9 DoF fusion and AHRS (Attitude and Heading Reference System)
-    float GyroMeasError = PI * (40.0f / 180.0f);   // gyroscope measurement error in rads/s (start at 40 deg/s)
-    float GyroMeasDrift = PI * (0.0f  / 180.0f);   // gyroscope measurement drift in rad/s/s (start at 0.0 deg/s/s)
-    float beta = sqrtf(3.0f / 4.0f) * GyroMeasError;   // compute beta
-    float zeta = sqrtf(3.0f / 4.0f) * GyroMeasDrift;   // compute zeta, the other free parameter in the Madgwick scheme usually set to a small or zero value
+    const float GyroMeasError = PI * (40.0f / 180.0f);   // gyroscope measurement error in rads/s (start at 40 deg/s)
+    const float GyroMeasDrift = PI * (0.0f  / 180.0f);   // gyroscope measurement drift in rad/s/s (start at 0.0 deg/s/s)
+    const float beta = sqrtf(3.0f / 4.0f) * GyroMeasError;   // compute beta
+    const float zeta = sqrtf(3.0f / 4.0f) * GyroMeasDrift;   // compute zeta, the other free parameter in the Madgwick scheme usually set to a small or zero value
 
     // Variables used for in between measurements
-    float   magCalibration[3] = {0, 0, 0};  // Factory mag calibration and mag bias
     float   temperature;    // Stores the MPU9250 internal chip temperature in degrees Celsius
 
     // These can be measured once and entered here or can be calculated each time the device is powered on
-    float   gyroBias[3] = {0.96, -0.21, 0.12}, accelBias[3] = {0.00299, -0.00916, 0.00952};
-    float   magBias[3] = {71.04, 122.43, -36.90}, magScale[3]  = {1.01, 1.03, 0.96}; // Bias corrections for gyro and accelerometer
+    std::array<float, 3> gyroBias;
+    std::array<float, 3> accelBias;
+    std::array<float, 3> magBias;
+    std::array<float, 3> magScale; // Bias corrections for gyro and accelerometer
+    std::array<float, 3> magCalibration;  // Factory mag calibration and mag bias
 
     uint32_t lastUpdate = 0;                   // used to calculate integration interval
 
     float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};    // vector to hold quaternion
     float eInt[3] = {0.0f, 0.0f, 0.0f};       // vector to hold integral error for Mahony method
 
-    bool _dmpReady = false;
-    bool calibrated = false;
+    bool _dmpReady = false;                  // Indicate that the DMP is ready
+    bool calibrated = false;                 // Indicate that teh device was just calibrated
 
 public:
     HWHeadTrackmpu9250();

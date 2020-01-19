@@ -34,6 +34,16 @@
 #define  GFS_1000DPS 2
 #define  GFS_2000DPS 3
 
+// Define I2C addresses of MPU9250
+#define ADO 0
+#if ADO
+#define MPU9250_ADDRESS 0x69   // Device address when ADO = 1
+#define AK8963_ADDRESS  0x0C   //  Address of magnetometer
+#else
+#define MPU9250_ADDRESS 0x68   // Device address when ADO = 0
+#define AK8963_ADDRESS  0x0C   //  Address of magnetometer
+#endif
+
 
 class MPU9250 {
 public:
@@ -43,7 +53,6 @@ public:
     void resetMPU9250();
     void initMPU9250(uint8_t Ascale, uint8_t Gscale, uint8_t sampleRate);
     void initAK8963(uint8_t Mscale, uint8_t Mmode, float* destination);
-    void initAK8963Slave(uint8_t Mscale, uint8_t Mmode, float* destination);
     float getAres(uint8_t Ascale);
     float getGres(uint8_t Gscale);
     float getMres(uint8_t Mscale);

@@ -70,12 +70,12 @@ $("#calibrate").on('click', function (e) {
         } else {
             $('#calibration_result').css("display", "block");
             $('#calibration_status').html("Ok! ..... Restarting device.");
-            $('#el_XGyroOffset').html(result.XGyroOffset);
+            /*$('#el_XGyroOffset').html(result.XGyroOffset);
             $('#el_YGyroOffset').html(result.YGyroOffset);
             $('#el_ZGyroOffset').html(result.ZGyroOffset);
             $('#el_XAccelOffset').html(result.XAccelOffset);
             $('#el_YAccelOffset').html(result.YAccelOffset);
-            $('#el_ZAccelOffset').html(result.ZAccelOffset);
+            $('#el_ZAccelOffset').html(result.ZAccelOffset);*/
         }
     })
     .catch(function(err) {

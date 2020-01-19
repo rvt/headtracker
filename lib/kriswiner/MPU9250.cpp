@@ -187,15 +187,7 @@ uint8_t MPU9250::getMPU9250ID() {
 }
 
 uint8_t MPU9250::getAK8963CID() {
-    //  uint8_t c = readByte(AK8963_ADDRESS, WHO_AM_I_AK8963);  // Read WHO_AM_I register for MPU-9250
-    writeByte(MPU9250_ADDRESS, USER_CTRL, 0x20);    // Enable I2C Master mode
-    writeByte(MPU9250_ADDRESS, I2C_MST_CTRL, 0x0D); // I2C configuration multi-master I2C 400KHz
-
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_ADDR, AK8963_ADDRESS | 0x80);    // Set the I2C slave address of AK8963 and set for read.
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_REG, WHO_AM_I_AK8963);           // I2C slave 0 register address from where to begin data transfer
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_CTRL, 0x81);                     // Enable I2C and transfer 1 byte
-    delay(10);
-    uint8_t c = readByte(MPU9250_ADDRESS, EXT_SENS_DATA_00);             // Read the WHO_AM_I byte
+    uint8_t c = readByte(AK8963_ADDRESS, WHO_AM_I_AK8963);  // Read WHO_AM_I register for MPU-9250
     return c;
 }
 
@@ -355,12 +347,7 @@ void MPU9250::readGyroData(int16_t* destination) {
 
 bool MPU9250::checkNewMagData() {
     bool test;
-    //  test = (readByte(AK8963_ADDRESS, AK8963_ST1) & 0x01);
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_ADDR, AK8963_ADDRESS | 0x80);    // Set the I2C slave address of AK8963 and set for read.
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_REG, AK8963_ST1);                // I2C slave 0 register address from where to begin data transfer
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_CTRL, 0x81);                     // Enable I2C and transfer 1 byte
-    delay(2);
-    test = (readByte(MPU9250_ADDRESS, EXT_SENS_DATA_00) & 0x01);         // Check data ready status byte
+    test = (readByte(AK8963_ADDRESS, AK8963_ST1) & 0x01);
     return test;
 }
 
@@ -379,12 +366,7 @@ bool MPU9250::checkWakeOnMotion() {
 
 void MPU9250::readMagData(int16_t* destination) {
     uint8_t rawData[7];  // x/y/z gyro register data, ST2 register stored here, must read ST2 at end of data acquisition
-    //  readBytes(AK8963_ADDRESS, AK8963_XOUT_L, 7, &rawData[0]);  // Read the six raw data and ST2 registers sequentially into data array
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_ADDR, AK8963_ADDRESS | 0x80);    // Set the I2C slave address of AK8963 and set for read.
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_REG, AK8963_XOUT_L);             // I2C slave 0 register address from where to begin data transfer
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_CTRL, 0x87);                     // Enable I2C and read 7 bytes
-    delay(2);
-    readBytes(MPU9250_ADDRESS, EXT_SENS_DATA_00, 7, &rawData[0]);        // Read the x-, y-, and z-axis calibration values
+    readBytes(AK8963_ADDRESS, AK8963_XOUT_L, 7, &rawData[0]);  // Read the six raw data and ST2 registers sequentially into data array
     uint8_t c = rawData[6]; // End data read by reading ST2 register
 
     if (!(c & 0x08)) { // Check if magnetic sensor overflow set, if not then report data
@@ -422,59 +404,6 @@ void MPU9250::initAK8963(uint8_t Mscale, uint8_t Mmode, float* magCalibration) {
     // and enable continuous mode data acquisition Mmode (bits [3:0]), 0010 for 8 Hz and 0110 for 100 Hz sample rates
     writeByte(AK8963_ADDRESS, AK8963_CNTL, Mscale << 4 | Mmode); // Set magnetometer data resolution and sample ODR
     delay(10);
-}
-
-void MPU9250::initAK8963Slave(uint8_t Mscale, uint8_t Mmode, float* magCalibration) {
-    // First extract the factory calibration for each magnetometer axis
-    uint8_t rawData[3];  // x/y/z gyro calibration data stored here
-
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_ADDR, AK8963_ADDRESS);           // Set the I2C slave address of AK8963 and set for write.
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_REG, AK8963_CNTL2);              // I2C slave 0 register address from where to begin data transfer
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_DO, 0x01);                       // Reset AK8963
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_CTRL, 0x81);                     // Enable I2C and write 1 byte
-    delay(50);
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_ADDR, AK8963_ADDRESS);           // Set the I2C slave address of AK8963 and set for write.
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_REG, AK8963_CNTL);               // I2C slave 0 register address from where to begin data transfer
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_DO, 0x00);                       // Power down magnetometer
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_CTRL, 0x81);                     // Enable I2C and write 1 byte
-    delay(50);
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_ADDR, AK8963_ADDRESS);           // Set the I2C slave address of AK8963 and set for write.
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_REG, AK8963_CNTL);               // I2C slave 0 register address from where to begin data transfer
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_DO, 0x0F);                       // Enter fuze mode
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_CTRL, 0x81);                     // Enable I2C and write 1 byte
-    delay(50);
-
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_ADDR, AK8963_ADDRESS | 0x80);    // Set the I2C slave address of AK8963 and set for read.
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_REG, AK8963_ASAX);               // I2C slave 0 register address from where to begin data transfer
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_CTRL, 0x83);                     // Enable I2C and read 3 bytes
-    delay(50);
-    readBytes(MPU9250_ADDRESS, EXT_SENS_DATA_00, 3, &rawData[0]);        // Read the x-, y-, and z-axis calibration values
-    magCalibration[0] = (float)(rawData[0] - 128) / 256.0f + 1.0f;       // Return x-axis sensitivity adjustment values, etc.
-    magCalibration[1] = (float)(rawData[1] - 128) / 256.0f + 1.0f;
-    magCalibration[2] = (float)(rawData[2] - 128) / 256.0f + 1.0f;
-    _magCalibration[0] = magCalibration[0];
-    _magCalibration[1] = magCalibration[1];
-    _magCalibration[2] = magCalibration[2];
-    _Mmode = Mmode;
-
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_ADDR, AK8963_ADDRESS);           // Set the I2C slave address of AK8963 and set for write.
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_REG, AK8963_CNTL);               // I2C slave 0 register address from where to begin data transfer
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_DO, 0x00);                       // Power down magnetometer
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_CTRL, 0x81);                     // Enable I2C and transfer 1 byte
-    delay(50);
-
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_ADDR, AK8963_ADDRESS);           // Set the I2C slave address of AK8963 and set for write.
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_REG, AK8963_CNTL);               // I2C slave 0 register address from where to begin data transfer
-    // Configure the magnetometer for continuous read and highest resolution
-    // set Mscale bit 4 to 1 (0) to enable 16 (14) bit resolution in CNTL register,
-    // and enable continuous mode data acquisition Mmode (bits [3:0]), 0010 for 8 Hz and 0110 for 100 Hz sample rates
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_DO, Mscale << 4 | Mmode);        // Set magnetometer data resolution and sample ODR
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_CTRL, 0x81);                     // Enable I2C and transfer 1 byte
-    delay(50);
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_ADDR, AK8963_ADDRESS | 0x80);    // Set the I2C slave address of AK8963 and set for read.
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_REG, AK8963_CNTL);               // I2C slave 0 register address from where to begin data transfer
-    writeByte(MPU9250_ADDRESS, I2C_SLV0_CTRL, 0x81);                     // Enable I2C and transfer 1 byte
-    delay(50);
 }
 
 
@@ -531,25 +460,17 @@ void MPU9250::initMPU9250(uint8_t Ascale, uint8_t Gscale, uint8_t sampleRate) {
     // Set interrupt pin active high, push-pull, hold interrupt pin level HIGH until interrupt cleared,
     // clear on read of INT_STATUS, and enable I2C_BYPASS_EN so additional chips
     // can join the I2C bus and all can be controlled by the Arduino as master
-    writeByte(MPU9250_ADDRESS, INT_PIN_CFG, 0x10);  // INT is 50 microsecond pulse and any read to clear
+    //   writeByte(MPU9250_ADDRESS, INT_PIN_CFG, 0x22);
+    writeByte(MPU9250_ADDRESS, INT_PIN_CFG, 0x12);  // INT is 50 microsecond pulse and any read to clear
     writeByte(MPU9250_ADDRESS, INT_ENABLE, 0x01);  // Enable data ready (bit 0) interrupt
     delay(100);
-
-    writeByte(MPU9250_ADDRESS, USER_CTRL, 0x20);          // Enable I2C Master mode
-    writeByte(MPU9250_ADDRESS, I2C_MST_CTRL, 0x1D);       // I2C configuration STOP after each transaction, master I2C bus at 400 KHz
-    writeByte(MPU9250_ADDRESS, I2C_MST_DELAY_CTRL, 0x81); // Use blocking data retreival and enable delay for mag sample rate mismatch
-    writeByte(MPU9250_ADDRESS, I2C_SLV4_CTRL, 0x01);      // Delay mag data retrieval to once every other accel/gyro data sample
 }
 
 
 void MPU9250::magcalMPU9250(float* dest1, float* dest2, float mRes) {
-    uint16_t ii = 0,
-             sample_count = 0;
-    int32_t mag_bias[3] = {0, 0, 0},
-                          mag_scale[3] = {0, 0, 0};
-    int16_t mag_max[3] = {-32767, -32767, -32767},
-                         mag_min[3] = {32767, 32767, 32767},
-                                      mag_temp[3] = {0, 0, 0};
+    uint16_t ii = 0, sample_count = 0;
+    int32_t mag_bias[3] = {0, 0, 0}, mag_scale[3] = {0, 0, 0};
+    int16_t mag_max[3] = {-32767, -32767, -32767}, mag_min[3] = {32767, 32767, 32767}, mag_temp[3] = {0, 0, 0};
 
     Serial.println("Mag Calibration: Wave device in a figure eight until done!");
     delay(4000);
@@ -930,5 +851,7 @@ void MPU9250::readBytes(uint8_t address, uint8_t subAddress, uint8_t count, uint
         dest[i++] = Wire.read();
     }         // Put read results in the Rx buffer
 }
+
+
 
 
