@@ -358,6 +358,8 @@ void loop() {
         if (hwTrack->loop()) {
             last_measurement = hwTrack->getOrientation();
         }
+            
+        sendTracker();
 
         if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
             wm.process();

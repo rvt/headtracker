@@ -183,7 +183,7 @@ bool HWHeadTrackmpu9250::loop() {
 
             sum += deltat; // sum for averaging filter update rate
 
-            MadgwickQuaternionUpdate(q, beta, deltat,
+            MadgwickQuaternionUpdate(q, deltat, beta,
                                      -ax, +ay, +az,
                                      gx * PI / 180.0f, -gy * PI / 180.0f, -gz * PI / 180.0f,
                                      my,  -mx, mz);
