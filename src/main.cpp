@@ -33,7 +33,7 @@
 #define UPDATES_PER_SECOND            200
 #define EFFECT_PERIOD_CALLBACK        (1000 / UPDATES_PER_SECOND)
 #define TRACKER_CONFIG_FILENAME       "/tracker.json"
-#define TRACKER_CONFIG_DOCUMENT_SIZE  512
+#define TRACKER_CONFIG_DOCUMENT_SIZE  1024
 #define PROTOCOL_FREEPIE              "freepie"
 #define PROTOCOL_OPENTRACKUDP         "opentrackudp"
 #undef M_PI
@@ -59,6 +59,7 @@ std::unique_ptr<HWHeadTrack> hwTrack(nullptr);
 // Used to send data over UDP
 IPAddress trackerIpAddress;        // tracker IP address, should be reloaded on each config chance
 uint16_t  trackerPort;             // tracker port number
+bool doCalibrate = false;
 
 // Configuration
 StaticJsonDocument<TRACKER_CONFIG_DOCUMENT_SIZE> json;
@@ -159,7 +160,17 @@ void sendTracker() {
         sendFreePieDatagram();
     }
 }
+void calibrateMpu() {
+    if (!json.containsKey(hwTrack->name())) {
+        json.createNestedObject(hwTrack->name());
+    }
 
+    JsonObject config = json[hwTrack->name()].as<JsonObject>();
+    hwTrack->calibrate(config);
+
+    shouldSaveConfig = true;
+    shouldRestart = millis();
+}
 
 
 
@@ -192,25 +203,15 @@ void serverOnlineCallback() {
 
     wm.server->on(STORE_CALIBRATION_URI, []() {
         if (hwTrack->isReady()) {
-
-            if (!json.containsKey(hwTrack->name())) {
-                json.createNestedObject(hwTrack->name());
-            }
-
-            JsonObject config = json[hwTrack->name()].as<JsonObject>();
-            hwTrack->calibrate(config);
-            serializeJsonPretty(config, Serial);
-
-            shouldSaveConfig = true;
+            doCalibrate = true;
 
             // Send result back
-            wm.server->setContentLength(measureJson(config));
+            // JsonObject config = json[hwTrack->name()].as<JsonObject>();
+            // wm.server->setContentLength(measureJson(config));
             wm.server->send(200, F("application/javascript"), "");
             WiFiClient client = wm.server->client();
-            serializeJson(config, client);
+            // serializeJson(config, client);
 
-            // Request restart
-            shouldRestart = millis();
         } else {
             // We would like to send a 503 but tje JS framework doesn´t give us the body
             wm.server->send(200, F("application/json"), F("{\"status\":\"error\", \"message\":\"MPU is not ready, please check hardware.\"}"));
@@ -369,6 +370,11 @@ void loop() {
         } else if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
             if (transitionCounter % UPDATES_PER_SECOND == slot - 1) {
                 hwTrack->setup(json[hwTrack->name()]);
+            }
+        } else if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
+            if (doCalibrate) {
+                doCalibrate = false;
+                calibrateMpu();
             }
         } else if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
             if (shouldSaveConfig) {

@@ -16,7 +16,7 @@ HWHeadTrackmpu6050::HWHeadTrackmpu6050() {
 bool HWHeadTrackmpu6050::loop() {
 
     // if programming failed, don't try to do anything
-    if (!isReady()) {
+    if (!isReady() || calibrated) {
         return false;
     }
 
@@ -88,7 +88,7 @@ bool HWHeadTrackmpu6050::loop() {
 
 void HWHeadTrackmpu6050::setup(JsonObject json) {
     // initialize device
-    if (isReady()) {
+    if (isReady() || calibrated) {
         return;
     }
 

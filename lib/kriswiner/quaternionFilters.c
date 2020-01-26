@@ -46,7 +46,7 @@ __attribute__((optimize("O3"))) void MadgwickQuaternionUpdate(
     // Normalise accelerometer measurement
     norm = sqrtf(ax * ax + ay * ay + az * az);
 
-    if (norm < 0.0000001f) {
+    if (norm < 0.001f) {
         return;    // handle NaN
     }
 
@@ -58,7 +58,7 @@ __attribute__((optimize("O3"))) void MadgwickQuaternionUpdate(
     // Normalise magnetometer measurement
     norm = sqrtf(mx * mx + my * my + mz * mz);
 
-    if (norm == 0.0f) {
+    if (norm < 0.001f) {
         return;    // handle NaN
     }
 

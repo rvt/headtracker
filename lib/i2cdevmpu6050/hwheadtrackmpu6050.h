@@ -22,7 +22,7 @@ public:
     HWHeadTrackmpu6050();
 
     virtual bool isReady() const {
-        return _dmpReady && !calibrated;
+        return _dmpReady;
     }
     virtual void setup(JsonObject json);
     virtual bool loop();

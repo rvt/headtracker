@@ -23,14 +23,11 @@ HWHeadTrackmpu9250::HWHeadTrackmpu9250() {
 
 void HWHeadTrackmpu9250::setup(JsonObject json) {
     // initialize device only if we are not yet ready
-    if (isReady()) {
+    if (isReady() || calibrated) {
         return;
     }
 
     Serial.println(F("Initializing MPU9250..."));
-    pinMode(INTERRUPT_PIN, INPUT);
-
-
     mpu->I2Cscan(); // should detect BME280 at 0x77, MPU9250 at 0x71
 
     /* Configure the MPU9250 */
@@ -86,6 +83,7 @@ void HWHeadTrackmpu9250::setup(JsonObject json) {
             magScale[0] = json["MS0"].as<float>();
             magScale[1] = json["MS1"].as<float>();
             magScale[2] = json["MS2"].as<float>();
+            magScale = {1.01, 1.03, 0.96};
 
             Serial.println(F("Using saved calibration."));
         } else {
@@ -98,6 +96,7 @@ void HWHeadTrackmpu9250::setup(JsonObject json) {
         // Comment out if using pre-measured, pre-stored offset biases
 
         mpu->initMPU9250(Ascale, Gscale, sampleRate);
+
         Serial.println("MPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
 
         // Read the WHO_AM_I register of the magnetometer, this is a good test of communication
@@ -113,6 +112,7 @@ void HWHeadTrackmpu9250::setup(JsonObject json) {
         mpu->initAK8963(Mscale, Mmode, magCalibration.data());
         Serial.println("AK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
 
+        pinMode(INTERRUPT_PIN, INPUT);
         attachInterrupt(INTERRUPT_PIN, HWHeadTrackmpu9250_dmpDataReady, RISING);  // define interrupt for intPin output of MPU9250
         _dmpReady = true;
         Serial.print("DMP Ready!");
@@ -123,6 +123,10 @@ void HWHeadTrackmpu9250::setup(JsonObject json) {
 }
 
 bool HWHeadTrackmpu9250::loop() {
+    if (!isReady() || calibrated) {
+        return false;
+    }
+
     // If intPin goes high, either all data registers have new data
     if (HWHeadTrackmpu9250_mpuInterrupt == true) {  // On interrupt, read data
         HWHeadTrackmpu9250_mpuInterrupt = false;     // reset newData flag
@@ -133,7 +137,6 @@ bool HWHeadTrackmpu9250::loop() {
         mpu->readMPU9250Data(MPU9250Data); // INT cleared on any read
 
         float ax, ay, az, gx, gy, gz, mx, my, mz; // variables to hold latest sensor data values
-        //float lin_ax, lin_ay, lin_az;             // linear acceleration (acceleration with gravity component subtracted)
         float pitch, yaw, roll;                   // absolute orientation
         float a12, a22, a31, a32, a33;            // rotation matrix coefficients for Euler angles and gravity components
 
@@ -141,6 +144,8 @@ bool HWHeadTrackmpu9250::loop() {
         ax = (float)MPU9250Data[0] * aRes - accelBias[0]; // get actual g value, this depends on scale being set
         ay = (float)MPU9250Data[1] * aRes - accelBias[1];
         az = (float)MPU9250Data[2] * aRes - accelBias[2];
+
+        temperature = ((float) MPU9250Data[3]) / 333.87f + 21.0f; // Gyro chip temperature in degrees Centigrade
 
         // Calculate the gyro value into actual degrees per second
         gx = (float)MPU9250Data[4] * gRes - gyroBias[0]; // get actual gyro value, this depends on scale being set
@@ -160,27 +165,38 @@ bool HWHeadTrackmpu9250::loop() {
         mz *= magScale[2];
         //    }
 
-        float sum = 0.0f;          // integration interval for both filter schemes
+        /*{
+            // Debug perpose
+            // Drop in a tool like https://app.rawgraphs.io
+            // to check for calibration
+            static int ccc = 0;
 
-        for (uint8_t i = 0; i < 10; i++) { // iterate a fixed number of times per data read cycle
-            uint32_t now = micros();
-            float deltat = ((now - lastUpdate) / 1000000.0f); // set integration time by time elapsed since last filter update
-            lastUpdate = now;
+            if (ccc++ % 20 == 0) {
+                Serial.print(gz, 2);
+                Serial.print(",");
+                Serial.print(mx, 2);
+                Serial.print(",");
+                Serial.print(my, 2);
+                Serial.print(",");
+                Serial.print(mz, 2);
+                Serial.println();
+            }
+        }*/
 
-            sum += deltat; // sum for averaging filter update rate
+        uint32_t now = micros();
+        float deltat = ((float)(now - lastUpdate) / 1000000.0f); // set integration time by time elapsed since last filter update
+        lastUpdate = now;
 
-            MadgwickQuaternionUpdate(q, deltat, beta,
-                                     -ax, +ay, +az,
-                                     gx * PI / 180.0f, -gy * PI / 180.0f, -gz * PI / 180.0f,
-                                     my,  -mx, mz);
-            /*             MahonyQuaternionUpdate(q, eInt, deltat,
-                                               Ki, Kp,
-                                               -ax, +ay, +az,
-                                               gx * PI / 180.0f, -gy * PI / 180.0f, -gz * PI / 180.0f,
-                                               my,  -mx, mz); */
-        }
-
-        temperature = ((float) MPU9250Data[3]) / 333.87f + 21.0f; // Gyro chip temperature in degrees Centigrade
+        /*
+        MadgwickQuaternionUpdate(q, deltat, beta,
+                                 ax, ay, az,
+                                 gx * PI / 180.0f, gy * PI / 180.0f, gz * PI / 180.0f,
+                                 my, mx, -mz);*/
+        MahonyQuaternionUpdate(q, eInt, deltat,
+                               Ki, Kp,
+                               ax, ay, az,
+                               gx * PI / 180.0f, gy * PI / 180.0f, gz * PI / 180.0f,
+                               my,  mx, -mz);
 
         a12 =   2.0f * (q[1] * q[2] + q[0] * q[3]);
         a22 =   q[0] * q[0] + q[1] * q[1] - q[2] * q[2] - q[3] * q[3];
@@ -209,34 +225,37 @@ bool HWHeadTrackmpu9250::loop() {
         pOrientation.x = 0.0f;
         pOrientation.y = 0.0f;
         pOrientation.z = 0.0f;
-
         return true;
     }
 
     return false;
-
 }
 
 void HWHeadTrackmpu9250::calibrate(JsonObject& jsonObject) {
     _dmpReady = false;
     calibrated = true;
 
+    // Reset device and init MPU to start gyro and accell calibration
     mpu->resetMPU9250(); // start by resetting MPU9250
+    mpu->initMPU9250(Ascale, Gscale, sampleRate);
     Serial.println("About to start calibrating gyro and accelerator, keep device flat and still!!!");
-    delay(2500);
     Serial.println("Starting....");
     uint32_t start = micros();
     mpu->calibrateMPU9250(gyroBias.data(), accelBias.data()); // Calibrate gyro and accelerometers, load biases in bias registers
-
     Serial.print("Finnished in ");
     Serial.print((float)(micros() - start) / 1000000, 1);
     Serial.println(" seconds");
 
-    // Comment out if using pre-measured, pre-stored offset biases
+    // Reset again, then start calibration of magnetic compess
+    // NoteÑ If we don´t reset and init the device, the magnet compass calbration will fail
+    mpu->resetMPU9250(); // start by resetting MPU9250
+    mpu->initMPU9250(Ascale, Gscale, sampleRate);
+    delay(5000);
+
+    // Start calibration fo compass
     Serial.println("About to start calibrating magnetic compass, Wave device in a figure eight until done!");
-    delay(4000);
+    mpu->initAK8963(Mscale, Mmode, magCalibration.data());
     Serial.println("Starting....");
-    delay(1500);
     start = micros();
     mpu->magcalMPU9250(magBias.data(), magScale.data(), mRes);
 
@@ -259,5 +278,4 @@ void HWHeadTrackmpu9250::calibrate(JsonObject& jsonObject) {
     jsonObject["MS0"] = magScale[0];
     jsonObject["MS1"] = magScale[1];
     jsonObject["MS2"] = magScale[2];
-
 }

@@ -175,7 +175,6 @@
 #define AK8963_ADDRESS  0x0C   //  Address of magnetometer
 #endif
 
-
 MPU9250::MPU9250(uint8_t intPin) {
     _intPin = intPin;
 }
@@ -190,6 +189,7 @@ uint8_t MPU9250::getAK8963CID() {
     uint8_t c = readByte(AK8963_ADDRESS, WHO_AM_I_AK8963);  // Read WHO_AM_I register for MPU-9250
     return c;
 }
+
 
 
 float MPU9250::getMres(uint8_t Mscale) {
@@ -298,7 +298,6 @@ void MPU9250::gyromagSleep() {
     writeByte(MPU9250_ADDRESS, PWR_MGMT_1, temp | 0x10);     // Write bit 4 to enable gyro standby
     delay(10); // Wait for all registers to reset
 }
-
 
 void MPU9250::gyromagWake(uint8_t Mmode) {
     uint8_t temp = 0;
@@ -466,7 +465,6 @@ void MPU9250::initMPU9250(uint8_t Ascale, uint8_t Gscale, uint8_t sampleRate) {
     delay(100);
 }
 
-
 void MPU9250::magcalMPU9250(float* dest1, float* dest2, float mRes) {
     uint16_t ii = 0, sample_count = 0;
     int32_t mag_bias[3] = {0, 0, 0}, mag_scale[3] = {0, 0, 0};
@@ -621,12 +619,12 @@ void MPU9250::calibrateMPU9250(float* dest1, float* dest2) {
     data[5] = (-gyro_bias[2] / 4)       & 0xFF;
 
     // Push gyro biases to hardware registers
-    writeByte(MPU9250_ADDRESS, XG_OFFSET_H, data[0]);
-    writeByte(MPU9250_ADDRESS, XG_OFFSET_L, data[1]);
-    writeByte(MPU9250_ADDRESS, YG_OFFSET_H, data[2]);
-    writeByte(MPU9250_ADDRESS, YG_OFFSET_L, data[3]);
-    writeByte(MPU9250_ADDRESS, ZG_OFFSET_H, data[4]);
-    writeByte(MPU9250_ADDRESS, ZG_OFFSET_L, data[5]);
+    writeByte(MPU9250_ADDRESS, XG_OFFSET_H, 0);
+    writeByte(MPU9250_ADDRESS, XG_OFFSET_L,  0);
+    writeByte(MPU9250_ADDRESS, YG_OFFSET_H,  0);
+    writeByte(MPU9250_ADDRESS, YG_OFFSET_L,  0);
+    writeByte(MPU9250_ADDRESS, ZG_OFFSET_H,  0);
+    writeByte(MPU9250_ADDRESS, ZG_OFFSET_L,  0);
 
     // Output scaled gyro biases for display in the main program
     dest1[0] = (float) gyro_bias[0] / (float) gyrosensitivity;
@@ -674,12 +672,12 @@ void MPU9250::calibrateMPU9250(float* dest1, float* dest2) {
     // Apparently this is not working for the acceleration biases in the MPU-9250
     // Are we handling the temperature correction bit properly?
     // Push accelerometer biases to hardware registers
-    //  writeByte(MPU9250_ADDRESS, XA_OFFSET_H, data[0]);
-    //  writeByte(MPU9250_ADDRESS, XA_OFFSET_L, data[1]);
-    //  writeByte(MPU9250_ADDRESS, YA_OFFSET_H, data[2]);
-    //  writeByte(MPU9250_ADDRESS, YA_OFFSET_L, data[3]);
-    //  writeByte(MPU9250_ADDRESS, ZA_OFFSET_H, data[4]);
-    //  writeByte(MPU9250_ADDRESS, ZA_OFFSET_L, data[5]);
+    writeByte(MPU9250_ADDRESS, XA_OFFSET_H, 0);
+    writeByte(MPU9250_ADDRESS, XA_OFFSET_L, 0);
+    writeByte(MPU9250_ADDRESS, YA_OFFSET_H, 0);
+    writeByte(MPU9250_ADDRESS, YA_OFFSET_L, 0);
+    writeByte(MPU9250_ADDRESS, ZA_OFFSET_H, 0);
+    writeByte(MPU9250_ADDRESS, ZA_OFFSET_L, 0);
 
     // Output scaled accelerometer biases for display in the main program
     dest2[0] = (float)accel_bias[0] / (float)accelsensitivity;

@@ -11,8 +11,7 @@
 
 */
 
-#ifndef MPU9250_h
-#define MPU9250_h
+#pragma once
 
 #include "Arduino.h"
 #include "Wire.h"
@@ -84,4 +83,3 @@ private:
     float _magCalibration[3];
 };
 
-#endif
