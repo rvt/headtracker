@@ -1,4 +1,4 @@
-# Head tracking with esp8266/esp8265 and MPU6050
+# Head tracking with esp8266/esp8265 and MPU6050 or MPU9250
 
 # Installation
 
@@ -34,4 +34,19 @@ It´s a bit tricky to print but it will work out if you put up some support mate
 ![Holder for MPU6050 menu](img/mpu6050_holder.png "mpu6050")
 
 The ESP8266 can be put in a other box and you can connect the MPU6050 and ESP8266 using a 5 wire shielded cable. Make sure it´s not longer than 1.5 to 2 meter (I have tested 1.5m) otherwhise I2C communication mght fail.
+
+# calibration and zero
+
+Within the setup page there is a tool to setup calibration and setting 'zero' orientation.
+Calibration of the mpu9250 is unfortunatly more than tricky, but if you have questions please ask.
+
+
+# TODO
+* guide trought calibration for imu's
+* show calibration values on UI + quality of qualibration (mpu 9250)
+* add more IMU's like the ICM-20948
+* code cleanup, this was somewhat hacked together to create a MVP
+* add more output protocols.
+
+
 
