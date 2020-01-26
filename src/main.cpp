@@ -29,6 +29,9 @@
 #include <hwheadtrackmpu6050.h>
 #include <hwheadtrackmpu9250.h>
 
+#ifndef RAD_TO_DEG
+#define RAD_TO_DEG (180.f / M_PI)
+#endif
 
 #define UPDATES_PER_SECOND            200
 #define EFFECT_PERIOD_CALLBACK        (1000 / UPDATES_PER_SECOND)
@@ -42,6 +45,7 @@
 #define JBONE_URI                      "/jscript.js"
 #define TRACK_PEEK_URI                 "/peek"
 #define STORE_CALIBRATION_URI          "/calibrate"
+#define ZERO_URI                       "/zero"
 
 // routine to ensure we send timed message to the tracker
 uint32_t effectPeriodStartMillis = 0;
@@ -53,7 +57,10 @@ uint32_t shouldRestart = 0;        // Indicate that a service requested an resta
 bool shouldReloadAddress = false;  // Indicate when we should reload trackerIpAddress and trackerPort
 bool hasTrackerLocation = false;   // Indicate when the tracker IP and port is known and good
 
-HWHeadTrack_Orientation last_measurement;
+// Orientation of MPU in space, all in RAD
+HWHeadTrack_Orientation lastMeasurement;    // Last measurement from MPU
+HWHeadTrack_Orientation zeroLocation;       // Location at zero
+HWHeadTrack_Orientation offsetLocation;     // Location after applying zeroLocation from lastMeasurement
 std::unique_ptr<HWHeadTrack> hwTrack(nullptr);
 
 // Used to send data over UDP
@@ -122,9 +129,9 @@ void sendFreePieDatagram() {
     FreePie freepie {
         0,
         2,
-        last_measurement.yaw,
-        last_measurement.pitch,
-        last_measurement.roll,
+        offsetLocation.yaw,
+        offsetLocation.pitch,
+        offsetLocation.roll,
         0, 0, 0,
         0, 0, 0, 0, 0, 0
     };
@@ -139,9 +146,9 @@ void sendOpentrackDatagram() {
         0.0,
         0.0,
         0.0,
-        last_measurement.yaw * 180 / M_PI,
-        last_measurement.pitch * 180 / M_PI,
-        last_measurement.roll * 180 / M_PI
+        offsetLocation.yaw * RAD_TO_DEG,
+        offsetLocation.pitch * RAD_TO_DEG,
+        offsetLocation.roll* RAD_TO_DEG
     };
     sendDatagramToTracker((uint8_t*) &openTrack, (size_t)sizeof(OpenTrack));
 }
@@ -160,6 +167,7 @@ void sendTracker() {
         sendFreePieDatagram();
     }
 }
+
 void calibrateMpu() {
     if (!json.containsKey(hwTrack->name())) {
         json.createNestedObject(hwTrack->name());
@@ -186,15 +194,32 @@ void serverOnlineCallback() {
         wm.server->sendContent_P((char*)jscript_js_gz, jscript_js_gz_len);
     });
 
+    wm.server->on(ZERO_URI, []() {
+        zeroLocation = lastMeasurement;
+
+        if (!json.containsKey("zero")) {
+            json.createNestedObject("zero");
+        }
+        JsonObject config = json["zero"].as<JsonObject>();
+        config["yaw"] = zeroLocation.yaw;
+        config["pitch"] = zeroLocation.pitch;
+        config["roll"] = zeroLocation.roll;
+        config["x"] = zeroLocation.x;
+        config["y"] = zeroLocation.y;
+        config["z"] = zeroLocation.z;
+        shouldSaveConfig = true;
+        wm.server->send(200, "application/javascript", "{}");
+    });
+
     wm.server->on(TRACK_PEEK_URI, []() {
         char payloadBuffer[128];
         sprintf(payloadBuffer, "{\"yaw\":%.2f,\"pitch\":%.2f,\"roll\":%.2f,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f}",
-                last_measurement.yaw * 180 / M_PI,
-                last_measurement.pitch * 180 / M_PI,
-                last_measurement.roll * 180 / M_PI,
-                last_measurement.x,
-                last_measurement.y,
-                last_measurement.z
+                offsetLocation.yaw * RAD_TO_DEG,
+                offsetLocation.pitch * RAD_TO_DEG,
+                offsetLocation.roll * RAD_TO_DEG,
+                offsetLocation.x,
+                offsetLocation.y,
+                offsetLocation.z
                );
 
         wm.server->setContentLength(strlen(payloadBuffer));
@@ -325,8 +350,8 @@ void setup() {
     Serial.println("connected...yeey :)");
     wm.startWebPortal();
 
+    // Load tracker configuration
     shouldReloadAddress = loadTrackConfig();
-
     if (shouldReloadAddress == true) {
         // Configu page will get the info from here
         custom_track_server.setValue(json["tracker_server"], 40);
@@ -334,6 +359,17 @@ void setup() {
         custom_track_protocol.setValue(json["tracker_protocol"], 12);
     } else {
         Serial.println(F("COnfiguration not loaded, is this first time started?"));
+    }
+
+    // Load zero offset
+    if (json.containsKey("zero")) {
+        const JsonObject config = json["zero"].as<JsonObject>();
+        zeroLocation.yaw = config["yaw"].as<float>();
+        zeroLocation.pitch = config["pitch"].as<float>();
+        zeroLocation.roll = config["roll"].as<float>();
+        zeroLocation.x = config["x"].as<float>();
+        zeroLocation.y = config["y"].as<float>();
+        zeroLocation.z = config["z"].as<float>();
     }
 
     // join I2C bus (I2Cdev library doesn't do this automatically)
@@ -360,7 +396,18 @@ void loop() {
         uint8_t slot = 0;
 
         if (hwTrack->loop()) {
-            last_measurement = hwTrack->getOrientation();
+            lastMeasurement = hwTrack->getOrientation();
+
+            // We expect -180 to 180 degrees yaw where 0 is looking straight at the screen
+            lastMeasurement.yaw -= M_PI;
+
+            // calculate offset location
+            offsetLocation.yaw = lastMeasurement.yaw - zeroLocation.yaw;
+            offsetLocation.pitch = lastMeasurement.pitch - zeroLocation.pitch;
+            offsetLocation.roll = lastMeasurement.roll - zeroLocation.roll;
+            offsetLocation.x = lastMeasurement.x - zeroLocation.x;
+            offsetLocation.y = lastMeasurement.y - zeroLocation.y;
+            offsetLocation.z = lastMeasurement.z - zeroLocation.z;
         }
 
         sendTracker();

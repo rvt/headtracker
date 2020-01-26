@@ -1,3 +1,9 @@
+<style>
+    .error {
+        color:red;
+    }
+</style>
+
 <p>Protocol to use when communicating with the tracker</p>
 <div><input class="protocol_check" style='width:auto' type='radio' name='protocol' id='check_freepie' value='freepie'>FreePie</div>
 <div><input class="protocol_check" style='width:auto' type='radio' name='protocol' id='check_opentrackudp' value='opentrackudp'>Opentrack UDP</div>
@@ -31,7 +37,15 @@ Roll: <span id="el_roll"></span>&deg;</br>
 <P>After the calibration is finnished we will use these values and display them here, then we 
     restart your device.</P>
 <button id="calibrate" onclick="return false;">Calibrate</button>
-<p id="calibration_status"></p>
+
+
+<P>To setup the correct ´zero´ position look at the screen in a nuteral position
+    and wait untill the screen is stable. Then press the ´zero´button once.
+</P>
+<button id="zero" onclick="return false;">Zero</button>
+
+<p id="status_message"></p>
+<p class="error" id="error_message"></p>
 
 <div style="display:none" id="calibration_result">    
     XGyroOffset: <span id="el_XGyroOffset">-</span><br/>
@@ -61,15 +75,15 @@ setInterval(() => {
 
 $("#calibrate").on('click', function (e) {
     $("button").css("opacity", "0.8").css("display", "inline").attr("disabled", true);
-    $('#calibration_status').html("Calibrating, please wait....");
+    $('#status_message').html("Calibrating, please wait....");
     fetchival('/calibrate')
     .get()
     .then(function(result) {
         if (result.status === 'error') {
-            $('#calibration_status').html(result.message);
+            $('#status_message').html(result.message);
         } else {
             $('#calibration_result').css("display", "block");
-            $('#calibration_status').html("Ok! ..... Restarting device.");
+            $('#status_message').html("Ok! ..... Restarting device.");
             /*$('#el_XGyroOffset').html(result.XGyroOffset);
             $('#el_YGyroOffset').html(result.YGyroOffset);
             $('#el_ZGyroOffset').html(result.ZGyroOffset);
@@ -79,7 +93,18 @@ $("#calibrate").on('click', function (e) {
         }
     })
     .catch(function(err) {
-        $('#calibration_status').html("Unknown error");
+        $('#error_message').html("Unknown error");
+    })
+})
+
+$("#zero").on('click', function (e) {
+    fetchival('/zero')
+    .get()
+    .then(function(result) {
+        $('#status_message').html("Values set to zero");
+    })
+    .catch(function(err) {
+        $('#error_message').html("Unknown error");
     })
 })
 

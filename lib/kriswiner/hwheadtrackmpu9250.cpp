@@ -183,20 +183,21 @@ bool HWHeadTrackmpu9250::loop() {
             }
         }*/
 
-        uint32_t now = micros();
-        float deltat = ((float)(now - lastUpdate) / 1000000.0f); // set integration time by time elapsed since last filter update
-        lastUpdate = now;
+        for (uint8_t i = 0; i < 10; i++) { // iterate a fixed number of times per data read cycle
+            uint32_t now = micros();
+            float deltat = ((now - lastUpdate) / 1000000.0f); // set integration time by time elapsed since last filter update
+            lastUpdate = now;
 
-        /*
-        MadgwickQuaternionUpdate(q, deltat, beta,
-                                 ax, ay, az,
-                                 gx * PI / 180.0f, gy * PI / 180.0f, gz * PI / 180.0f,
-                                 my, mx, -mz);*/
-        MahonyQuaternionUpdate(q, eInt, deltat,
-                               Ki, Kp,
-                               ax, ay, az,
-                               gx * PI / 180.0f, gy * PI / 180.0f, gz * PI / 180.0f,
-                               my,  mx, -mz);
+            MadgwickQuaternionUpdate(q, deltat, beta,
+                                     ax, ay, az,
+                                     gx * PI / 180.0f, gy * PI / 180.0f, gz * PI / 180.0f,
+                                     my, mx, -mz);
+            /*            MahonyQuaternionUpdate(q, eInt, deltat,
+                                               Ki, Kp,
+                                               ax, ay, az,
+                                               gx * PI / 180.0f, gy * PI / 180.0f, gz * PI / 180.0f,
+                                               my,  mx, -mz); */
+        }
 
         a12 =   2.0f * (q[1] * q[2] + q[0] * q[3]);
         a22 =   q[0] * q[0] + q[1] * q[1] - q[2] * q[2] - q[3] * q[3];
