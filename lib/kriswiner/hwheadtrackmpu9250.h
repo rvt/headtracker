@@ -2,7 +2,7 @@
 
 #include <hwheadtrack.h>
 #include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
-#include "mpu9250.h"
+#include "MPU9250.h"
 
 /**
  * 6DOF MPU6050 HeadTracker

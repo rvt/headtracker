@@ -24,7 +24,7 @@
 
 #include "jscript.generated.h"
 #include "protocolSelect_html.generated.h"
-#include "I2Cdev.h"
+// #include "I2Cdev.h"
 #include <hwheadtrack.h>
 #include <hwheadtrackmpu6050.h>
 #include <hwheadtrackmpu9250.h>
