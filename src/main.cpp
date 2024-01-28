@@ -33,6 +33,7 @@
 #define RAD_TO_DEG (180.f / M_PI)
 #endif
 
+#define TRIGGER_PIN                   0         // Flash button in nodemcu
 #define UPDATES_PER_SECOND            200
 #define EFFECT_PERIOD_CALLBACK        (1000 / UPDATES_PER_SECOND)
 #define TRACKER_CONFIG_FILENAME       "/tracker.json"
@@ -109,7 +110,7 @@ void saveParamCallback() {
 bool loadAddressInfoFromConfig() {
     if (json.containsKey("tracker_server")) {
         trackerPort = json["tracker_port"].as<int>();
-        const char* tmp = json["tracker_server"].as<char*>();
+        const char* tmp = json["tracker_server"].as<const char*>();
         return trackerIpAddress.fromString(tmp);
     }
 
@@ -302,7 +303,24 @@ bool saveConfigSPIFFS() {
     return false;
 }
 
-
+void checkButton(){
+  // check for button press
+  if ( digitalRead(TRIGGER_PIN) == LOW ) {
+    // poor mans debounce/press-hold, code not ideal for production
+    delay(50);
+    if( digitalRead(TRIGGER_PIN) == LOW ){
+      Serial.println("Button Pressed");
+      // still holding button for 3000 ms, reset settings, code not ideaa for production
+      delay(3000); // reset delay hold
+      if( digitalRead(TRIGGER_PIN) == LOW ){
+        Serial.println("Button Held");
+        Serial.println("Erasing Config, restarting");
+        wm.resetSettings();
+        ESP.restart();
+      }
+    }
+  }
+}
 
 void setup() {
 
@@ -312,6 +330,8 @@ void setup() {
 
     Serial.println("\n Starting");
     WiFi.setSleepMode(WIFI_NONE_SLEEP); // disable sleep, can improve ap stability
+
+    pinMode(TRIGGER_PIN, INPUT);
 
     wm.setClass("invert");
 
@@ -379,15 +399,15 @@ void setup() {
 #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
     Fastwire::setup(400, true);
 #endif
-    //hwTrack.reset(new HWHeadTrackmpu6050());
-    hwTrack.reset(new HWHeadTrackmpu9250());
+    hwTrack.reset(new HWHeadTrackmpu6050());
+    // hwTrack.reset(new HWHeadTrackmpu9250());
 
     effectPeriodStartMillis = millis();
 }
 
 #define NUMBER_OF_SLOTS 10
 void loop() {
-
+    checkButton();
     const uint32_t currentMillis = millis();
 
     if (currentMillis - effectPeriodStartMillis >= EFFECT_PERIOD_CALLBACK) {
