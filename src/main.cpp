@@ -109,7 +109,7 @@ void saveParamCallback() {
 bool loadAddressInfoFromConfig() {
     if (json.containsKey("tracker_server")) {
         trackerPort = json["tracker_port"].as<int>();
-        const char* tmp = json["tracker_server"].as<char*>();
+        const char* tmp = json["tracker_server"].as<const char*>();
         return trackerIpAddress.fromString(tmp);
     }
 
