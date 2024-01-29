@@ -306,6 +306,7 @@ bool saveConfigSPIFFS() {
 void checkButton(){
   // check for button press
   if ( digitalRead(TRIGGER_PIN) == LOW ) {
+    noInterrupts();
     // poor mans debounce/press-hold, code not ideal for production
     delay(50);
     if( digitalRead(TRIGGER_PIN) == LOW ){
@@ -319,6 +320,7 @@ void checkButton(){
         ESP.restart();
       }
     }
+    interrupts();
   }
 }
 
