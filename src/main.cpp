@@ -228,7 +228,7 @@ void serverOnlineCallback() {
     });
 
     wm.server->on(STORE_CALIBRATION_URI, []() {
-        if (hwTrack->isReady()) {
+        if (1) { // if (hwTrack->isReady()) {
             doCalibrate = true;
 
             // Send result back
@@ -311,6 +311,7 @@ void checkButton(){
     delay(50);
     if( digitalRead(TRIGGER_PIN) == LOW ){
       Serial.println("Button Pressed");
+      ESP.restart();
       // still holding button for 3000 ms, reset settings, code not ideaa for production
       delay(3000); // reset delay hold
       if( digitalRead(TRIGGER_PIN) == LOW ){
@@ -380,7 +381,7 @@ void setup() {
         custom_track_port.setValue(json["tracker_port"], 5);
         custom_track_protocol.setValue(json["tracker_protocol"], 12);
     } else {
-        Serial.println(F("COnfiguration not loaded, is this first time started?"));
+        Serial.println(F("Configuration not loaded, is this first time started?"));
     }
 
     // Load zero offset
@@ -403,7 +404,7 @@ void setup() {
 #endif
     hwTrack.reset(new HWHeadTrackmpu6050());
     // hwTrack.reset(new HWHeadTrackmpu9250());
-
+    
     effectPeriodStartMillis = millis();
 }
 

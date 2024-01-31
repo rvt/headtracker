@@ -182,10 +182,10 @@ void HWHeadTrackmpu6050::calibrate(JsonObject& jsonObject) {
     // Do calibration
     calMpu.CalibrateAccel(6);
     calMpu.CalibrateGyro(6);
-    calMpu.CalibrateAccel(1);
-    calMpu.CalibrateGyro(1);
-    calMpu.CalibrateAccel(1);
-    calMpu.CalibrateGyro(1);
+    // calMpu.CalibrateAccel(1);
+    // calMpu.CalibrateGyro(1);
+    // calMpu.CalibrateAccel(1);
+    // calMpu.CalibrateGyro(1);
 
     // Store config
     jsonObject["XGO"] = calMpu.getXGyroOffset();
