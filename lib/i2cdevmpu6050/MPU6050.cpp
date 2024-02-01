@@ -36,6 +36,7 @@ THE SOFTWARE.
 */
 
 #include "MPU6050.h"
+#include "helper_3dmath.h"
 #if defined(ARDUINO_ARCH_MBED)
 #include "api/deprecated-avr-comp/avr/dtostrf.c.impl"
 #endif
@@ -3301,14 +3302,15 @@ void MPU6050::PID(uint8_t ReadAddress, float kP,float kI, uint8_t Loops){
 	int16_t BitZero[3];
 	uint8_t shift =(SaveAddress == 0x77)?3:2;
 	float Error, PTerm, ITerm[3], rawG[3];
+    // float temp;
 	VectorFloat v_rawG, v_normG;
 	int16_t eSample;
 	uint32_t eSum;
-	uint16_t gravity = 8192; // prevent uninitialized compiler warning
-	if (ReadAddress == 0x3B) gravity = 16384 >> getFullScaleAccelRange();
+	uint16_t gravity = 16384;
+	uint16_t epsilon = gravity * 1.0E-96;
 	Serial.write('>');
 	for (int i = 0; i < 3; i++) {
-		I2Cdev::readWords(devAddr, SaveAddress + (i * shift), 1, (uint16_t *)&Data, I2Cdev::readTimeout); // reads 1 or more 16 bit integers (Word)
+		I2Cdev::readWords(devAddr, SaveAddress + (i * shift), 1, (uint16_t *)&Data); // reads 1 or more 16 bit integers (Word)
 		Reading[i] = Data;
 		if(SaveAddress != 0x13){
 			BitZero[i] = Data & 1;										 // Capture Bit Zero to properly handle Accelerometer calibration
@@ -3316,38 +3318,61 @@ void MPU6050::PID(uint8_t ReadAddress, float kP,float kI, uint8_t Loops){
 			} else {
 			ITerm[i] = Reading[i] * 4;
 		}
+		// temp = ITerm[i];
+		// Serial.printf("PTerm:%f\t\tITerm:%f",PTerm,temp);
+		// Serial.print("\n");
 	}
 	for (int L = 0; L < Loops; L++) {
 		eSample = 0;
 		for (int c = 0; c < 100; c++) {// 100 PI Calculations
 			eSum = 0;
 			for (int i = 0; i < 3; i++) {
-				I2Cdev::readWords(devAddr, ReadAddress + (i * 2), 1, (uint16_t *)&Data, I2Cdev::readTimeout); // reads 1 or more 16 bit integers (Word)
+				I2Cdev::readWords(devAddr, ReadAddress + (i * 2), 1, (uint16_t *)&Data); // reads 1 or more 16 bit integers (Word)
 				Reading[i] = Data;
 				rawG[i] = Data;
 				if ((ReadAddress == 0x3B)&&(i == 2)) {
 					v_rawG.x = rawG[0];
 					v_rawG.y = rawG[1];
 					v_rawG.z = rawG[2];
-					v_normG = v_rawG.getNormalized();
+					if (v_rawG.getMagnitude() < gravity + epsilon && v_rawG.getMagnitude() > gravity - epsilon) {
+						// do nothing
+					}else {
+						v_normG = v_rawG.getNormalized();
+					}
 					Reading[0] -= gravity * v_normG.x;	//remove Gravity
 					Reading[1] -= gravity * v_normG.y;
 					Reading[2] -= gravity * v_normG.z;
 				}
 			}
+			// Serial.printf("kP:%f\t\tkI:%f",kP,kI);
+			// Serial.print("\n");
+			// Serial.printf("Rx:%f\t\tRy:%f\t\tRz:%f",rawG[0],rawG[1],rawG[2]);
+			// Serial.print("\n");
+			// Serial.printf("Ex:%f\t\tEy:%f\t\tEz:%f",-Reading[0],-Reading[1],-Reading[2]);
+			// Serial.print("\n");
 			for (int i = 0; i < 3; i++) {
+				if (isnan(Reading[i])) {Reading[i] = 0;}
 				Error = -Reading[i];
 				eSum += abs(Reading[i]);
 				PTerm = kP * Error;
 				ITerm[i] += (Error * 0.001) * kI;				// Integral term 1000 Calculations a second = 0.001
+				// temp = ITerm[i];
+				// Serial.printf("PTerm:%f\t\tITerm:%f",PTerm,temp);
+				// Serial.print("\n");
 				if(SaveAddress != 0x13){
 					Data = round((PTerm + ITerm[i] ) / 8);		//Compute PID Output
 					Data = ((Data)&0xFFFE) |BitZero[i];			// Insert Bit0 Saved at beginning
 				} else Data = round((PTerm + ITerm[i] ) / 4);	//Compute PID Output
 				I2Cdev::writeWords(devAddr, SaveAddress + (i * shift), 1, (uint16_t *)&Data);
+				// delay(200);
 			}
 			if((c == 99) && eSum > 1000){						// Error is still to great to continue 
 				c = 0;
+				// Serial.printf("%x",Data);
+				// Serial.printf("x:%f,y:%f,z:%f",v_normG.x,v_normG.y,v_normG.z);
+				// Serial.print("\n");
+				// Serial.printf("A:%f",v_rawG.getMagnitude());
+				// Serial.print("\n");
 				Serial.write('*');
 			}
 			if((eSum * ((ReadAddress == 0x3B)?.05: 1)) < 5) eSample++;	// Successfully found offsets prepare to  advance

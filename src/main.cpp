@@ -311,7 +311,6 @@ void checkButton(){
     delay(50);
     if( digitalRead(TRIGGER_PIN) == LOW ){
       Serial.println("Button Pressed");
-      ESP.restart();
       // still holding button for 3000 ms, reset settings, code not ideaa for production
       delay(3000); // reset delay hold
       if( digitalRead(TRIGGER_PIN) == LOW ){
@@ -319,7 +318,10 @@ void checkButton(){
         Serial.println("Erasing Config, restarting");
         wm.resetSettings();
         ESP.restart();
+        return;
       }
+      doCalibrate = true;
+      return;
     }
     interrupts();
   }
@@ -422,7 +424,7 @@ void loop() {
             lastMeasurement = hwTrack->getOrientation();
 
             // We expect -180 to 180 degrees yaw where 0 is looking straight at the screen
-            lastMeasurement.yaw -= M_PI;
+            // lastMeasurement.yaw -= M_PI;
 
             // calculate offset location
             offsetLocation.yaw = lastMeasurement.yaw - zeroLocation.yaw;
@@ -442,11 +444,13 @@ void loop() {
                 hwTrack->setup(json[hwTrack->name()]);
             }
         } else if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
+            // Serial.write('3');
             if (doCalibrate) {
                 doCalibrate = false;
                 calibrateMpu();
             }
         } else if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
+            // Serial.write('4');
             if (shouldSaveConfig) {
                 shouldSaveConfig = false;
                 saveConfigSPIFFS();
