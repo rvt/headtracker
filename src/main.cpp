@@ -444,13 +444,11 @@ void loop() {
                 hwTrack->setup(json[hwTrack->name()]);
             }
         } else if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
-            // Serial.write('3');
             if (doCalibrate) {
                 doCalibrate = false;
                 calibrateMpu();
             }
         } else if (transitionCounter % NUMBER_OF_SLOTS == slot++) {
-            // Serial.write('4');
             if (shouldSaveConfig) {
                 shouldSaveConfig = false;
                 saveConfigSPIFFS();

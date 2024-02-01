@@ -3318,9 +3318,6 @@ void MPU6050::PID(uint8_t ReadAddress, float kP,float kI, uint8_t Loops){
 			} else {
 			ITerm[i] = Reading[i] * 4;
 		}
-		// temp = ITerm[i];
-		// Serial.printf("PTerm:%f\t\tITerm:%f",PTerm,temp);
-		// Serial.print("\n");
 	}
 	for (int L = 0; L < Loops; L++) {
 		eSample = 0;
@@ -3344,35 +3341,20 @@ void MPU6050::PID(uint8_t ReadAddress, float kP,float kI, uint8_t Loops){
 					Reading[2] -= gravity * v_normG.z;
 				}
 			}
-			// Serial.printf("kP:%f\t\tkI:%f",kP,kI);
-			// Serial.print("\n");
-			// Serial.printf("Rx:%f\t\tRy:%f\t\tRz:%f",rawG[0],rawG[1],rawG[2]);
-			// Serial.print("\n");
-			// Serial.printf("Ex:%f\t\tEy:%f\t\tEz:%f",-Reading[0],-Reading[1],-Reading[2]);
-			// Serial.print("\n");
 			for (int i = 0; i < 3; i++) {
 				if (isnan(Reading[i])) {Reading[i] = 0;}
 				Error = -Reading[i];
 				eSum += abs(Reading[i]);
 				PTerm = kP * Error;
 				ITerm[i] += (Error * 0.001) * kI;				// Integral term 1000 Calculations a second = 0.001
-				// temp = ITerm[i];
-				// Serial.printf("PTerm:%f\t\tITerm:%f",PTerm,temp);
-				// Serial.print("\n");
 				if(SaveAddress != 0x13){
 					Data = round((PTerm + ITerm[i] ) / 8);		//Compute PID Output
 					Data = ((Data)&0xFFFE) |BitZero[i];			// Insert Bit0 Saved at beginning
 				} else Data = round((PTerm + ITerm[i] ) / 4);	//Compute PID Output
 				I2Cdev::writeWords(devAddr, SaveAddress + (i * shift), 1, (uint16_t *)&Data);
-				// delay(200);
 			}
 			if((c == 99) && eSum > 1000){						// Error is still to great to continue 
 				c = 0;
-				// Serial.printf("%x",Data);
-				// Serial.printf("x:%f,y:%f,z:%f",v_normG.x,v_normG.y,v_normG.z);
-				// Serial.print("\n");
-				// Serial.printf("A:%f",v_rawG.getMagnitude());
-				// Serial.print("\n");
 				Serial.write('*');
 			}
 			if((eSum * ((ReadAddress == 0x3B)?.05: 1)) < 5) eSample++;	// Successfully found offsets prepare to  advance
