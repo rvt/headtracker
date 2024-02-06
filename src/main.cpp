@@ -377,7 +377,7 @@ void setup() {
     if (shouldSaveConfig) {
         shouldSaveConfig = false;
         saveConfigSPIFFS();
-    } else 
+    }
     // Load tracker configuration
     shouldReloadAddress = loadTrackConfig();
     if (shouldReloadAddress == true) {
