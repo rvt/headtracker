@@ -374,7 +374,10 @@ void setup() {
     //if you get here you have connected to the WiFi
     Serial.println("connected...yeey :)");
     wm.startWebPortal();
-
+    if (shouldSaveConfig) {
+        shouldSaveConfig = false;
+        saveConfigSPIFFS();
+    } else 
     // Load tracker configuration
     shouldReloadAddress = loadTrackConfig();
     if (shouldReloadAddress == true) {
