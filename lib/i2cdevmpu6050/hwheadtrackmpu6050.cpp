@@ -5,7 +5,7 @@
 
 volatile bool HWHeadTrackmpu6050_mpuInterrupt = false;
 
-void ICACHE_RAM_ATTR HWHeadTrackmpu6050_dmpDataReady() {
+void IRAM_ATTR HWHeadTrackmpu6050_dmpDataReady() {
     HWHeadTrackmpu6050_mpuInterrupt = true;
 }
 

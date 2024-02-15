@@ -228,7 +228,7 @@ void serverOnlineCallback() {
     });
 
     wm.server->on(STORE_CALIBRATION_URI, []() {
-        if (hwTrack->isReady()) {
+        if (1) { // if (hwTrack->isReady()) {
             doCalibrate = true;
 
             // Send result back
@@ -306,6 +306,7 @@ bool saveConfigSPIFFS() {
 void checkButton(){
   // check for button press
   if ( digitalRead(TRIGGER_PIN) == LOW ) {
+    noInterrupts();
     // poor mans debounce/press-hold, code not ideal for production
     delay(50);
     if( digitalRead(TRIGGER_PIN) == LOW ){
@@ -317,8 +318,12 @@ void checkButton(){
         Serial.println("Erasing Config, restarting");
         wm.resetSettings();
         ESP.restart();
+        return;
       }
+      doCalibrate = true;
+      return;
     }
+    interrupts();
   }
 }
 
@@ -369,7 +374,10 @@ void setup() {
     //if you get here you have connected to the WiFi
     Serial.println("connected...yeey :)");
     wm.startWebPortal();
-
+    if (shouldSaveConfig) {
+        shouldSaveConfig = false;
+        saveConfigSPIFFS();
+    }
     // Load tracker configuration
     shouldReloadAddress = loadTrackConfig();
     if (shouldReloadAddress == true) {
@@ -378,7 +386,7 @@ void setup() {
         custom_track_port.setValue(json["tracker_port"], 5);
         custom_track_protocol.setValue(json["tracker_protocol"], 12);
     } else {
-        Serial.println(F("COnfiguration not loaded, is this first time started?"));
+        Serial.println(F("Configuration not loaded, is this first time started?"));
     }
 
     // Load zero offset
@@ -401,7 +409,7 @@ void setup() {
 #endif
     hwTrack.reset(new HWHeadTrackmpu6050());
     // hwTrack.reset(new HWHeadTrackmpu9250());
-
+    
     effectPeriodStartMillis = millis();
 }
 
@@ -419,7 +427,7 @@ void loop() {
             lastMeasurement = hwTrack->getOrientation();
 
             // We expect -180 to 180 degrees yaw where 0 is looking straight at the screen
-            lastMeasurement.yaw -= M_PI;
+            // lastMeasurement.yaw -= M_PI;
 
             // calculate offset location
             offsetLocation.yaw = lastMeasurement.yaw - zeroLocation.yaw;
